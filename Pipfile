@@ -1,0 +1,17 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+argparse = "1.4.0"
+keymap-drawer = "0.2.0"
+selenium = "4.3.0"
+pcpp = "1.30"
+pyyaml = "6.0"
+tree_sitter = "0.20.0"
+
+[dev-packages]
+
+[requires]
+python_version = "3.10"

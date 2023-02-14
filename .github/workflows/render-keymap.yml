@@ -1,0 +1,74 @@
+name: Render keymap image
+
+on:
+  workflow_call:
+    inputs:
+      keymap_type:
+        description: "Type of keymap file"
+        default: "qmk"
+        required: true
+        type: string
+      keymap_path:
+        description: "Path to the keymap directory"
+        default: "../layout.h"
+        required: true
+        type: string
+      config_path:
+        description: "Path to the config (legends)"
+        default: None
+        required: false
+        type: string
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        ref: ${{ github.head_ref }}
+    - uses: nanasess/setup-chromedriver@v1
+      with:
+        # Optional: do not specify to match Chrome's version
+        chromedriver-version: '88.0.4324.96'
+    - name: Launch browser
+      run: |
+        export DISPLAY=:99
+        chromedriver --url-base=/wd/hub &
+        sudo Xvfb -ac :99 -screen 0 1280x1024x24 > /dev/null 2>&1 & # optional
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    - name: Checkout keymap-display
+      uses: actions/checkout@v3
+      with: 
+        repository: jbarr21/keymap-display
+        path: keymap-display 
+    - name: Install dependencies
+      run: |
+        pushd $GITHUB_WORKSPACE/keymap-display
+        python -m pip install --upgrade pip
+        pip install pipenv
+        pipenv install
+        popd
+    - name: Prepare Selenium
+      uses: nanasess/setup-chromedriver@master
+    - name: Generate & download the image
+      run: |
+        pushd $GITHUB_WORKSPACE/keymap-display
+        pipenv run python keymap_display/keymap-display.py -l -s -i ${{ inputs.keymap_type }} -o kle -c ${{ inputs.config_path }} ../${{ inputs.keymap_path }}
+        ls -al $GITHUB_WORKSPACE/keymap-display/**/*.png
+        mv $GITHUB_WORKSPACE/keymap-display/keyboard-layout.png $GITHUB_WORKSPACE || true
+        popd
+    - name: Upload image
+      uses: actions/upload-artifact@v2
+      with:
+        name: ${{ github.actor }}-keyboard-layout.png
+        path: |
+          *.png
+        retention-days: 7
+    - name: Commit updated image
+      uses: stefanzweifel/git-auto-commit-action@v4
+      with:
+        commit_message: "[Skip CI] Automated keymap render"
+        file_pattern: keyboard-layout.png
