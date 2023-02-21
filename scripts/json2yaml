@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Convert a QMK keymap.json & layout.h to keymap-drawer yaml
-test -z "$QMK_HOME" && echo "Must set QMK_HOME to root qmk_firmware dir" && exit 1
-test "$#" != 2 && echo "Usage: ./json2yaml qmk-keymap.json layout.h" && exit 2 
+test -z "$QMK_HOME" && echo "Must set QMK_HOME to root qmk_firmware dir" && exit 1 || true
+test -z "$(which qmk)" && echo "Must have qmk_cli installed" && exit 2 || true
+test -z "$(which pcpp)" && echo "Must have pcpp cli installed" && exit 3 || true
+test "$#" != 2 && echo "Usage: ./json2yaml qmk-keymap.json layout.h" && exit 4 || true
 keymap_yaml='/tmp/keymap.yaml'
 keymap_json="$1"
 layout_h="$2"

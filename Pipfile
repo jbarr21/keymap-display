@@ -6,9 +6,10 @@ name = "pypi"
 [packages]
 argparse = "1.4.0"
 keymap-drawer = "0.3.0"
-selenium = "4.3.0"
 pcpp = "1.30"
 pyyaml = "6.0"
+qmk = "1.1.1"
+selenium = "4.3.0"
 tree_sitter = "0.20.0"
 
 [dev-packages]

@@ -35,19 +35,17 @@ def main() -> None:
             if args.save_image:
                 save_image(keymap.to_kle_url())
         case 'kd':
+            print(subprocess.check_output([f"{repo_root}/scripts/env-check"]).decode("utf-8"))
+
             if args.input == "qmk" and (args.json is None or len(args.json) == 0):
                 print("Must pass json keymap file for kd in QMK")
-                exit(1)
+                exit(10)
 
-            keymap_yaml_path = "/tmp/keymap.yaml"
-            with open(keymap_yaml_path, "w") as keymap_yaml:
-                subprocess.call(["sh", f"{repo_root}/scripts/json2yaml", args.json, args.keymap], stdout=keymap_yaml)
-                draw_cmd = ["keymap", "draw", keymap_yaml_path]
-                if args.save_image:
-                    with open(f"{repo_root}/keymap.svg", "w") as keymap_svg:
-                        subprocess.call(draw_cmd, stdout=keymap_svg)
-                else:
-                    subprocess.call(draw_cmd)
+            yaml = subprocess.check_output([f"{repo_root}/scripts/json2yaml", args.json, args.keymap])
+            svg = subprocess.check_output(["keymap", "draw", "-"], input=yaml)
+            if args.save_image:
+                with open(f"{repo_root}/keymap.svg", "w") as keymap_svg:
+                    keymap_svg.writelines(svg.decode("utf-8"))
 
 def load_config(config_path) -> dict:
     config = configparser.ConfigParser()
