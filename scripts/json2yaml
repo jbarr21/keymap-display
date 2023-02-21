@@ -2,66 +2,47 @@
 # Convert a QMK keymap.json & layout.h to keymap-drawer yaml
 test -z "$QMK_HOME" && echo "Must set QMK_HOME to root qmk_firmware dir" && exit 1
 test "$#" != 2 && echo "Usage: ./json2yaml qmk-keymap.json layout.h" && exit 2 
-
-yaml_file='/tmp/keymap.yaml'
-json_file="$1"
+keymap_yaml='/tmp/keymap.yaml'
+keymap_json="$1"
 layout_h="$2"
 
-# Convert keymap.json to keymap.c
-qmk json2c "$json_file" -o /tmp/keymap-json.c 2> /dev/null
-sed -i.bak '/QMK_KEYBOARD_H/d' /tmp/keymap-json.c
+# (1) Convert keymap.json (containing only layer name macros) to keymap.c
+# (2) Expand layer macros (define KEYMAP_DISPLAY so that aliases for shortcuts are not expanded)
+# (3) Convert keymap.c to QMK keymap.json
+# (4) Parse fully expanded QMK keymap.json into yaml using keymap-drawer
+qmk json2c "$keymap_json" -o /tmp/keymap-json.c 2> /dev/null 
+pcpp -D QMK_KEYBOARD_H="" -D KEYMAP_DISPLAY $layout_h /tmp/keymap-json.c > /tmp/keymap.c
+qmk c2json -kb "$(jq -r '.keyboard' $keymap_json)" -km default /tmp/keymap.c > /tmp/keymap.json 
+keymap parse -q /tmp/keymap.json > "$keymap_yaml"
 
-# Expand layer macros & skip comments
-gcc -E /tmp/keymap-json.c -include "$layout_h" -D KEYMAP_DISPLAY -D HRM_ENABLE 2>&1 | grep -vE "^# " > /tmp/keymap.c
-
-# Replace custom keycodes since c2json skips hex codes
-custom_keycodes=$(grep -oE '#define .*0x[a-f0-9]+$' $layout_h | sed 's|#define ||g')
-echo "$custom_keycodes" | while IFS='\n' read -r line; do
-    name=$(echo $line | cut -d ' ' -f 1)
-    val=$(echo $line | cut -d ' ' -f 2)
-    perl -i -pe "s|$val|$name|g" /tmp/keymap.c
-done
-
-# Convert keymap.c to JSON
-qmk c2json -kb "$(jq -r '.keyboard' $json_file)" -km default /tmp/keymap.c > /tmp/keymap.json
-
-# Convert expanded qmk json to yaml using keymap-drawer parser
-keymap parse -q /tmp/keymap.json > "$yaml_file"
+# Handle held keys
+perl -i -pe "s|\bHELD\b|{type: held}|g" "$keymap_yaml"
 
 # Restore layer names using layer macro names in keymap.json 
-layers=$(jq -cr ".layers[][0]" $json_file | sed 's|\s*\_||g')
 i=0
+layers=$(jq -cr ".layers[][0]" $keymap_json | sed 's|\s*\_||g')
 for name in $layers; do
-    perl -i -pe "s|\bL$i\b|$name|g" "$yaml_file"  # yaml layer names
-    perl -i -pe "s|\($i\)|($name)|g" "$yaml_file" # keycode refs (eg: MO, OSL, etc)
+    perl -i -pe "s|\bL$i\b|$name|g" "$keymap_yaml"  # yaml layer names
+    perl -i -pe "s|\($i\)|($name)|g" "$keymap_yaml" # keycode refs (eg: MO, OSL, etc)
+    perl -i -pe "s|t: '$i', h: sticky|t: '$name', h: sticky|g" "$keymap_yaml" # OSL
     let i=${i}+1
 done
 
+# TODO: remove after https://github.com/caksoylar/keymap-drawer/pull/4 is released
 # Replace one-shot keycodes as tap codes with stick hold label
-oneshots=$(grep -Eo 'OS[ML]\(\w+)' "$yaml_file" | sort | uniq)
+oneshots=$(grep -Eo 'OS[ML]\(\w+)' "$keymap_yaml" | sort | uniq)
 for key in $oneshots; do
     keycode=$(echo $key | tr -d "()" | sed 's|OS[ML]||g; s|^MOD_||g')
     replacement="{t: $keycode, h: sticky}"
-    sed -i.bak "s|$key|$replacement|g" "$yaml_file"
+    sed -i.bak "s|$key|$replacement|g" "$keymap_yaml"
 done
 
-# Restore define names for non-basic QMK keycodes like LG(LS(KC_SPC))
-defines=$(grep -oE '#define .*' $layout_h | sed 's|#define ||g' | grep -vE '(^_|OSM|OS_|HR_|TH_|LA_|LAYOUT_|0x|XXX$|\\$|\b\d$)')
-echo "$defines" | while IFS='\n' read -r line; do
-    name=$(echo $line | cut -d ' ' -f 1)
-    val=$(echo $line | cut -d ' ' -f 2 | sed 's|KC_||g')
-    sed -i.bak "s| $val,| $name,|g" "$yaml_file"
-done
-
+# TODO: remove after https://github.com/caksoylar/keymap-drawer/pull/5 is released
 # Replace underscores in labels from defines so it wraps
-upper_snake_labels=$(grep -oE '\w+(_\w+)+' "$yaml_file" | sort | uniq | grep -vE '[a-z]')
+upper_snake_labels=$(grep -oE '\w+(_\w+)+' "$keymap_yaml" | sort | uniq | grep -vE '[a-z]')
 for label in $upper_snake_labels; do
     replacement=$(echo $label | sed 's|\_| |g')
-    sed -i.bak "s|$label|$replacement|g" "$yaml_file"
+    sed -i.bak "s|$label|$replacement|g" "$keymap_yaml"
 done
 
-# Handle held keys
-perl -i -pe "s|\bHELD\b|{type: held}|g" "$yaml_file"
-
-# Output YAML and draw SVG
-cat "$yaml_file"
+cat "$keymap_yaml"
