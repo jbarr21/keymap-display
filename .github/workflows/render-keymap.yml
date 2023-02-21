@@ -3,15 +3,25 @@ name: Render keymap image
 on:
   workflow_call:
     inputs:
+      output_type:
+        description: "Output format (kle | kd)"
+        default: "kle"
+        required: true
+        type: string
       keymap_type:
-        description: "Type of keymap file"
+        description: "Type of keymap file (qmk | zmk | nf)"
         default: "qmk"
         required: true
         type: string
       keymap_path:
-        description: "Path to the keymap directory"
+        description: "Path to the keymap (.h layout file)"
         default: "../layout.h"
         required: true
+        type: string
+      keymap_json_path:
+        description: "Path to the keymap json"
+        default: None
+        required: false
         type: string
       config_path:
         description: "Path to the config (legends)"
@@ -56,19 +66,14 @@ jobs:
     - name: Generate & download the image
       run: |
         pushd $GITHUB_WORKSPACE/keymap-display
-        pipenv run python keymap_display/keymap-display.py -l -s -i ${{ inputs.keymap_type }} -o kle -c ${{ inputs.config_path }} ../${{ inputs.keymap_path }}
+        pipenv run python keymap_display/keymap-display.py -l -s -i ${{ inputs.keymap_type }} -o ${{ inputs.output_type }} -c ${{ inputs.config_path }} -j ${{ inputs.keymap_json_path }} ../${{ inputs.keymap_path }}
+        ls -al $GITHUB_WORKSPACE/keymap-display/**/*.svg
+        mv $GITHUB_WORKSPACE/keymap-display/keymap.svg $GITHUB_WORKSPACE || true
         ls -al $GITHUB_WORKSPACE/keymap-display/**/*.png
         mv $GITHUB_WORKSPACE/keymap-display/keyboard-layout.png $GITHUB_WORKSPACE || true
         popd
-    - name: Upload image
-      uses: actions/upload-artifact@v2
-      with:
-        name: ${{ github.actor }}-keyboard-layout.png
-        path: |
-          *.png
-        retention-days: 7
     - name: Commit updated image
       uses: stefanzweifel/git-auto-commit-action@v4
       with:
         commit_message: "[Skip CI] Automated keymap render"
-        file_pattern: keyboard-layout.png
+        file_pattern: "keymap.svg keyboard-layout.png"

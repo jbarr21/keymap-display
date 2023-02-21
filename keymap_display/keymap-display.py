@@ -2,6 +2,7 @@
 import argparse
 import configparser
 import os
+import subprocess
 
 from download import save_image
 from parse import parse
@@ -12,13 +13,14 @@ def main() -> None:
     parser.add_argument('-c', '--config', default='') 
     parser.add_argument('-i', '--input', choices=['qmk', 'zmk', 'nf'], required=True) 
     parser.add_argument('-o', '--output', choices=['kle', 'kd'], required=True)
+    parser.add_argument('-j', '--json')
     parser.add_argument('-s', '--save_image', help='Save the KLE image', action='store_true')
     parser.add_argument('-l', '--link', action='store_true')
     args = parser.parse_args()
 
+    repo_root = os.path.dirname(os.path.dirname(__file__))
     if args.config is None or len(args.config) == 0 or args.config == "None":
         props_suffix = "qmk" if args.input == "qmk" else "zmk"
-        repo_root = os.path.dirname(os.path.dirname(__file__))
         config_path = f"{repo_root}/config/legends-{props_suffix}.properties"
     else:
         config_path = args.config
@@ -33,7 +35,19 @@ def main() -> None:
             if args.save_image:
                 save_image(keymap.to_kle_url())
         case 'kd':
-            pass
+            if args.input == "qmk" and (args.json is None or len(args.json) == 0):
+                print("Must pass json keymap file for kd in QMK")
+                exit(1)
+
+            keymap_yaml_path = "/tmp/keymap.yaml"
+            with open(keymap_yaml_path, "w") as keymap_yaml:
+                subprocess.call(["sh", f"{repo_root}/scripts/json2yaml", args.json, args.keymap], stdout=keymap_yaml)
+                draw_cmd = ["keymap", "draw", keymap_yaml_path]
+                if args.save_image:
+                    with open(f"{repo_root}/keymap.svg", "w") as keymap_svg:
+                        subprocess.call(draw_cmd, stdout=keymap_svg)
+                else:
+                    subprocess.call(draw_cmd)
 
 def load_config(config_path) -> dict:
     config = configparser.ConfigParser()
