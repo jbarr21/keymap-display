@@ -83,4 +83,4 @@ jobs:
       uses: stefanzweifel/git-auto-commit-action@v4
       with:
         commit_message: "[Skip CI] Automated keymap render"
-        file_pattern: "keymap.svg keyboard-layout.png"
+        file_pattern: "*.svg *.png"
