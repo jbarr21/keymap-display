@@ -30,21 +30,4 @@ for name in $layers; do
     let i=${i}+1
 done
 
-# TODO: remove after https://github.com/caksoylar/keymap-drawer/pull/4 is released
-# Replace one-shot keycodes as tap codes with stick hold label
-oneshots=$(grep -Eo 'OS[ML]\(\w+)' "$keymap_yaml" | sort | uniq)
-for key in $oneshots; do
-    keycode=$(echo $key | tr -d "()" | sed 's|OS[ML]||g; s|^MOD_||g')
-    replacement="{t: $keycode, h: sticky}"
-    sed -i.bak "s|$key|$replacement|g" "$keymap_yaml"
-done
-
-# TODO: remove after https://github.com/caksoylar/keymap-drawer/pull/5 is released
-# Replace underscores in labels from defines so it wraps
-upper_snake_labels=$(grep -oE '\w+(_\w+)+' "$keymap_yaml" | sort | uniq | grep -vE '[a-z]')
-for label in $upper_snake_labels; do
-    replacement=$(echo $label | sed 's|\_| |g')
-    sed -i.bak "s|$label|$replacement|g" "$keymap_yaml"
-done
-
 cat "$keymap_yaml"
