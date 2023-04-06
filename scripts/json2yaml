@@ -14,20 +14,8 @@ layout_h="$2"
 # (4) Parse fully expanded QMK keymap.json into yaml using keymap-drawer
 qmk json2c "$keymap_json" -o /tmp/keymap-json.c 2> /dev/null 
 pcpp -D QMK_KEYBOARD_H="" -D KEYMAP_DISPLAY $layout_h /tmp/keymap-json.c > /tmp/keymap.c
-qmk c2json -kb "$(jq -r '.keyboard' $keymap_json)" -km default /tmp/keymap.c > /tmp/keymap.json 
-keymap parse -q /tmp/keymap.json > "$keymap_yaml"
-
-# Handle held keys
-perl -i -pe "s|\bHELD\b|{type: held}|g" "$keymap_yaml"
-
-# Restore layer names using layer macro names in keymap.json 
-i=0
+qmk c2json -kb "$(jq -r '.keyboard' $keymap_json)" -km default /tmp/keymap.c > /tmp/keymap.json
 layers=$(jq -cr ".layers[][0]" $keymap_json | sed 's|\s*\_||g')
-for name in $layers; do
-    perl -i -pe "s|\bL$i\b|$name|g" "$keymap_yaml"  # yaml layer names
-    perl -i -pe "s|\($i\)|($name)|g" "$keymap_yaml" # keycode refs (eg: MO, OSL, etc)
-    perl -i -pe "s|t: '$i', h: sticky|t: '$name', h: sticky|g" "$keymap_yaml" # OSL
-    let i=${i}+1
-done
+keymap parse -l $layers -q /tmp/keymap.json > "$keymap_yaml"
 
 cat "$keymap_yaml"
